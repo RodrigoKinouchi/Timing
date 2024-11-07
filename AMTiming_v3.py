@@ -38,7 +38,8 @@ if uploaded_file is not None:
     dados = pd.read_csv(uploaded_file).dropna(how='all', axis=1)
 
 # Criando abas de vizualização
-tabs = st.tabs(['Laptimes', 'Manufactures', 'Teams'])
+tabs = st.tabs(['Laptimes', 'Manufactures', 'Teams',
+               'Speed x GAP', 'GAP Analysis', 'Ranking by lap'])
 
 # Separar apenas as colunas de interesse
 df = dados[['Time of Day', 'Speed', 'Lap',
@@ -449,3 +450,282 @@ with tabs[2]:
 
     # Exibir gráfico no Streamlit
     st.plotly_chart(fig_t1)
+
+with tabs[3]:
+    results = []
+    current_pilot = None
+
+    for index, row in df.iterrows():  # Usando iterrows() para acessar as linhas
+        if "Stock" in row[0]:  # Se for o nome do piloto (coluna 0)
+            current_pilot = row[0]
+        elif isinstance(row[0], str) and ':' in row[0]:  # Verifica se é um tempo
+            time = pd.to_timedelta(row[0])
+            spt = row[7]  # Acessar a coluna SPT (índice 17)
+            results.append((current_pilot, time, spt))
+
+    cleaned_df = pd.DataFrame(
+        results, columns=['Piloto', 'Time of Day', 'SPT'])
+    cleaned_df = cleaned_df.sort_values(
+        by='Time of Day').reset_index(drop=True)
+    # GAP para cada carro em relação ao anterior
+    cleaned_df['GAP'] = cleaned_df['Time of Day'].diff().dt.total_seconds()
+    # Preencher o primeiro GAP como 0
+    cleaned_df['GAP'].fillna(0, inplace=True)
+    # Selecionar o piloto para análise
+    pilotos = cleaned_df['Piloto'].unique().tolist()
+    pilotos.insert(0, "")  # Adiciona uma opção vazia no início
+    selected_pilot = st.selectbox('Selecione um piloto:', pilotos)
+   # Filtrar apenas os dados do piloto selecionado se houver seleção
+    if selected_pilot:
+        pilot_data = cleaned_df[cleaned_df['Piloto'] == selected_pilot]
+
+        # Filtrar para SPT acima de 200
+        filtered_data = pilot_data[(
+            pilot_data['SPT'] > 200) & (pilot_data['GAP'] < 5)]
+
+        # Criar o gráfico interativo usando Plotly
+        fig = px.scatter(
+            filtered_data,
+            x='GAP',
+            y='SPT',
+            title=f'GAP vs Velocidade (SPT) > 200 km/h para {selected_pilot}',
+            labels={'GAP': 'GAP (s)', 'SPT': 'Velocidade (SPT) (km/h)'},
+            hover_data=['Time of Day'],  # Exibir o horário ao passar o mouse
+        )
+
+        # Personalizar o layout
+        fig.update_traces(marker=dict(size=10, opacity=0.7,
+                          line=dict(width=1, color='DarkSlateGrey')))
+        fig.update_layout(title_x=0.3)  # Centralizar o título
+
+        # Exibir o gráfico no Streamlit
+        st.plotly_chart(fig)
+    else:
+        st.warning('Por favor, selecione um piloto.')
+
+with tabs[4]:
+    results = []
+    current_pilot = None
+
+    # Processando os dados como antes
+    for index, row in df.iterrows():
+        if "Stock" in row[0]:  # Se for o nome do piloto (coluna 0)
+            current_pilot = row[0]
+        elif isinstance(row[0], str) and ':' in row[0]:  # Verifica se é um tempo
+            time = pd.to_timedelta(row[0])
+            results.append((current_pilot, time))
+
+    # Cria o DataFrame de resultados
+    cleaned_df = pd.DataFrame(
+        results, columns=['Piloto', 'Time of Day'])
+    cleaned_df = cleaned_df.sort_values(
+        by='Time of Day').reset_index(drop=True)
+
+    # Atribuir as voltas (Lap) corretamente, assumindo que as voltas começam de 1
+    cleaned_df['Lap'] = cleaned_df.groupby('Piloto').cumcount() + 1
+
+    # Selecionar o piloto para análise
+    pilotos = cleaned_df['Piloto'].unique().tolist()
+    pilotos.insert(0, "")  # Adiciona uma opção vazia no início
+
+    # Seleciona o piloto de referência
+    reference_pilot = st.selectbox(
+        'Selecione o piloto de referência:', pilotos)
+
+    if reference_pilot:
+        # Filtra os dados para o piloto de referência
+        reference_times = cleaned_df[cleaned_df['Piloto']
+                                     == reference_pilot]
+
+        # Verifica se o piloto de referência possui dados suficientes
+        if not reference_times.empty:
+            # Cria um dicionário de tempos para o piloto de referência com 'Lap' como chave
+            reference_time_dict = reference_times.set_index(
+                'Lap')['Time of Day'].to_dict()
+
+            # Calcula o GAP em relação ao piloto de referência para todos os pilotos
+            cleaned_df['Reference Time'] = cleaned_df['Lap'].map(
+                reference_time_dict)
+            cleaned_df['GAP to Reference'] = (
+                cleaned_df['Time of Day'] - cleaned_df['Reference Time']).dt.total_seconds()
+
+            # Agora, podemos agrupar os dados por piloto e plotar os GAPs ao longo das voltas
+            fig = px.line(
+                cleaned_df,
+                x='Lap',
+                y='GAP to Reference',
+                color='Piloto',
+                title=f'GAP em Relação ao Piloto({
+                    reference_pilot})',
+                labels={'Lap': 'Volta', 'GAP to Reference': 'GAP (s)'},
+                markers=True)
+
+            # Personalizar o gráfico
+            fig.update_layout(title_x=0.5)  # Centralizar o título
+            fig.update_traces(mode='lines+markers',
+                              marker=dict(size=6, opacity=0.7))
+
+            # Exibir o gráfico no Streamlit
+            st.plotly_chart(fig)
+        else:
+            st.warning(
+                f'O piloto {reference_pilot} não possui dados suficientes para análise.')
+    else:
+        st.warning('Por favor, selecione um piloto de referência.')
+
+with tabs[5]:
+    results = []
+    current_driver = None  # Vai armazenar o nome do piloto atual
+    driver_row = df['Time of Day'].str.contains('Stock', na=False)
+
+    # Iterar sobre as linhas do DataFrame
+    for i, row in df.iterrows():
+        time_of_day = row['Time of Day']
+
+        # Verifique se o 'Time of Day' contém o nome do piloto
+        # Verifica se é o nome do piloto
+        if isinstance(time_of_day, str) and 'Stock' in time_of_day:
+            current_driver = time_of_day  # Atualiza o piloto atual
+        elif current_driver:  # Se um piloto estiver definido, significa que estamos na volta dele
+            lap_time = row['Time in Seconds']  # Tempo da volta
+            lap_number = row['Lap']  # Número da volta
+
+            # Adicionar o resultado (piloto, tempo em segundos e número da volta)
+            results.append((current_driver, lap_time, lap_number))
+
+    # Agora criamos um DataFrame com os resultados
+    cleaned_df = pd.DataFrame(
+        results, columns=['Piloto', 'Time in Seconds', 'Lap'])
+
+    # Ordenar pelo 'Piloto' e 'Lap' para garantir a ordem correta das voltas
+    cleaned_df = cleaned_df.sort_values(
+        by=['Piloto', 'Lap']).reset_index(drop=True)
+
+    # Remover a string "- Stock Car PRO 2024" dos nomes dos pilotos
+    cleaned_df['Piloto'] = cleaned_df['Piloto'].str.replace(
+        ' - Stock Car PRO 2024', '', regex=False)
+
+    # Função para gerar o ranking por volta
+
+    def generate_ranking_by_lap(df):
+        rankings = []
+        for lap in df['Lap'].unique():
+            lap_data = df[df['Lap'] == lap]
+            lap_data_sorted = lap_data.sort_values(by='Time in Seconds')
+            lap_data_sorted['Rank'] = range(1, len(lap_data_sorted) + 1)
+            rankings.append(
+                lap_data_sorted[['Piloto', 'Time in Seconds', 'Lap', 'Rank']])
+
+        rankings_df = pd.concat(rankings, ignore_index=True)
+        rankings_df = rankings_df.sort_values(
+            by=['Lap', 'Rank']).reset_index(drop=True)
+        return rankings_df
+
+    # Gerar o ranking por volta
+    ranked_df = generate_ranking_by_lap(cleaned_df)
+
+    # Streamlit - selecionar o ranking para visualizar
+    st.title("Ranking por Volta")
+
+    # Dropdown para selecionar a volta
+    selected_lap = st.slider('Selecione a volta:', min_value=int(
+        ranked_df['Lap'].min()), max_value=int(ranked_df['Lap'].max()))
+
+    # Filtrar os dados para a volta selecionada
+    lap_data = ranked_df[ranked_df['Lap'] == selected_lap]
+
+    # Identificar pilotos do time
+    team_pilots = ['21 - Thiago Camilo', '30 - Cesar Ramos']
+
+    # Vamos grifar os pilotos do time no gráfico
+    lap_data['Destaque'] = lap_data['Piloto'].apply(
+        lambda x: 'Time' if x in team_pilots else 'Outro')
+
+    # Encontrar o melhor tempo de volta (tempo mínimo) para ajustar a escala
+    best_time = lap_data['Time in Seconds'].min()
+
+    # Definir o valor mínimo do eixo Y como 0.98% do melhor tempo
+    min_y_value = best_time * 0.98
+
+    # Gerar um gráfico de barras
+    fig = px.bar(
+        lap_data,
+        x='Piloto',
+        y='Time in Seconds',
+        title=f'Ranking por Volta {selected_lap}',
+        labels={'Piloto': 'Piloto', 'Time in Seconds': 'Tempo de Volta (s)'},
+        text='Rank',  # Mostrar a posição do piloto na barra
+    )
+
+    # Customização para destacar os nomes
+    fig.update_traces(
+        texttemplate='%{text}',  # Exibe o ranking dentro da barra
+        textposition='outside',  # Coloca o texto fora da barra
+        marker=dict(
+            color=lap_data['Destaque'].apply(
+                # Cor para destacar
+                lambda x: 'rgba(31, 119, 180, 0.7)' if x == 'Outro' else 'rgba(255, 0, 0, 0.7)')
+        )
+    )
+
+    # Destacar os nomes dos pilotos do time em negrito
+    for i in range(len(lap_data)):
+        if lap_data.iloc[i]['Destaque'] == 'Time':  # Se for um piloto do time
+            fig.add_annotation(
+                x=lap_data.iloc[i]['Piloto'],
+                y=lap_data.iloc[i]['Time in Seconds'],
+                text=lap_data.iloc[i]['Piloto'],
+                showarrow=True,
+                arrowhead=2,
+                arrowsize=1,
+                ax=0,
+                ay=-30,
+                # Destaque em negrito e cor
+                font=dict(size=12, color='red',
+                          family="Arial, sans-serif", weight='bold'),
+                align="center"
+            )
+
+    # Personalizar o gráfico
+    fig.update_layout(
+        title_x=0.5,
+        xaxis_title="Piloto",
+        yaxis_title="Tempo de Volta (s)",
+        showlegend=False,
+        xaxis_tickangle=-45,  # Melhor visualização dos nomes dos pilotos
+        # Definir o valor mínimo da escala Y como 0.98% do melhor tempo
+        yaxis=dict(range=[min_y_value, None])
+    )
+
+    # Exibir o gráfico no Streamlit
+    st.plotly_chart(fig)
+
+    # Exibir a tabela de rankings
+    st.write(f"Ranking da Volta {selected_lap}")
+    st.dataframe(lap_data[['Piloto', 'Time in Seconds', 'Rank']])
+
+    selected_pilot = st.selectbox(
+        "Selecione o piloto para ver o histórico de ranking", ranked_df['Piloto'].unique())
+
+    # Filtrar os dados do piloto selecionado
+    pilot_data = ranked_df[ranked_df['Piloto'] == selected_pilot]
+
+    # Gerar gráfico de linha para histórico de ranking
+    fig_line = px.line(
+        pilot_data,
+        x='Lap',
+        y='Rank',
+        title=f'Histórico de Ranking de {selected_pilot}',
+        labels={'Lap': 'Volta', 'Rank': 'Ranking'},
+        markers=True
+    )
+
+    # Ajustar o eixo Y para garantir que o ranking 1 apareça na parte inferior (melhor ranking)
+    fig_line.update_layout(
+        xaxis_title="Volta",
+        yaxis_title="Ranking",
+        title_x=0.5,
+    )
+
+    # Exibir o gráfico de histórico de ranking
+    st.plotly_chart(fig_line)

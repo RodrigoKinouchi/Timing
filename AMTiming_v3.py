@@ -17,7 +17,7 @@ st.set_page_config(
 
 # Carregando uma imagem
 image = Image.open(
-    'D:\Bkp\Python\ProgramaStock\Capa.png')
+    'images/Capa.png')
 
 # Inserindo a imagem na página utilizando os comandos do stremalit
 st.image(image, use_column_width=True)
@@ -31,7 +31,7 @@ st.write("")
 uploaded_file = st.file_uploader("Escolha um arquivo CSV", type="csv")
 
 
-url = "D:\Bkp\Python\ProgramaStock\SP24_8_P1_LAPS_CSV.csv"
+url = "SP24_8_P1_LAPS_CSV.csv"
 dados = pd.read_csv(url, sep=',').dropna(how='all', axis=1)
 
 if uploaded_file is not None:

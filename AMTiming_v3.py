@@ -523,6 +523,8 @@ with tabs[4]:
 
     # Atribuir as voltas (Lap) corretamente, assumindo que as voltas começam de 1
     cleaned_df['Lap'] = cleaned_df.groupby('Piloto').cumcount() + 1
+    cleaned_df['Piloto'] = cleaned_df['Piloto'].str.replace(
+        ' - Stock Car PRO 2024', '', regex=False)
 
     # Selecionar o piloto para análise
     pilotos = cleaned_df['Piloto'].unique().tolist()

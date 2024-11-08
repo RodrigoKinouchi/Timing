@@ -468,6 +468,8 @@ with tabs[3]:
         results, columns=['Piloto', 'Time of Day', 'SPT'])
     cleaned_df = cleaned_df.sort_values(
         by='Time of Day').reset_index(drop=True)
+    cleaned_df['Piloto'] = cleaned_df['Piloto'].str.replace(
+        ' - Stock Car PRO 2024', '', regex=False)
     # GAP para cada carro em relação ao anterior
     cleaned_df['GAP'] = cleaned_df['Time of Day'].diff().dt.total_seconds()
     # Preencher o primeiro GAP como 0

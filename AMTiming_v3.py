@@ -32,10 +32,10 @@ uploaded_file = st.file_uploader("Escolha um arquivo CSV", type="csv")
 
 
 url = "SP24_8_P1_LAPS_CSV.csv"
-dados = pd.read_csv(url, sep=',').dropna(how='all', axis=1)
+dados = pd.read_csv(url, sep=',')  # .dropna(how='all', axis=1)
 
 if uploaded_file is not None:
-    dados = pd.read_csv(uploaded_file).dropna(how='all', axis=1)
+    dados = pd.read_csv(uploaded_file)  # .dropna(how='all', axis=1)
 
 # Criando abas de vizualização
 tabs = st.tabs(['Laptimes', 'Manufactures', 'Teams',
@@ -46,7 +46,8 @@ df = dados[['Time of Day', 'Speed', 'Lap',
             'Lap Tm', 'S1 Tm', 'S2 Tm', 'S3 Tm', 'SPT']]
 
 df['SPT'] = df['SPT'].astype(str)
-df['SPT'] = df['SPT'].fillna('').astype(str)  # Preenche NaN com strings vazias
+df['SPT'] = df['SPT'].fillna(1)
+# df['SPT'] = df['SPT'].fillna('').astype(str)  # Preenche NaN com strings vazias
 
 
 # Criando a coluna Team, Montadora e Numeral no DataFrame df
@@ -490,7 +491,6 @@ with tabs[3]:
             y='SPT',
             title=f'GAP vs Velocidade (SPT) > 200 km/h para {selected_pilot}',
             labels={'GAP': 'GAP (s)', 'SPT': 'Velocidade (SPT) (km/h)'},
-            hover_data=['Time of Day'],  # Exibir o horário ao passar o mouse
         )
 
         # Personalizar o layout

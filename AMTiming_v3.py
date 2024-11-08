@@ -558,7 +558,7 @@ with tabs[4]:
                 y='GAP to Reference',
                 color='Piloto',
                 title=f'GAP em Relação ao Piloto {
-                    reference_pilot})',
+                    reference_pilot}',
                 labels={'Lap': 'Volta', 'GAP to Reference': 'GAP (s)'},
                 markers=True)
 

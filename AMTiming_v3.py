@@ -484,7 +484,7 @@ with tabs[3]:
 
         # Filtrar para SPT acima de 200
         filtered_data = pilot_data[(
-            pilot_data['SPT'] > 200) & (pilot_data['GAP'] < 5)]
+            pilot_data['SPT'] > 200)]
 
         # Criar o gráfico interativo usando Plotly
         fig = px.scatter(

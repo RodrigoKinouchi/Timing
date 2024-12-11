@@ -309,7 +309,7 @@ with tabs[2]:
         # Calcular o melhor tempo para o tipo atual
         best_time = times_df_teams[times_df_teams['Type']
                                    == type_name]['Value'].min()
-        limit = best_time * 1.08  # 5% acima do melhor tempo
+        limit = best_time * 1.02  # 5% acima do melhor tempo
 
         # Filtrar os dados para não incluir outliers
         filtered_data = times_df_teams[(times_df_teams['Type'] == type_name) &

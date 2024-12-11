@@ -170,6 +170,26 @@ best_time = times_df['Tempo de Volta em Segundos'].min()
 times_df_limit = best_time * 1.04
 times_df = times_df[times_df['Tempo de Volta em Segundos'] < times_df_limit]
 
+
+# Função para filtrar dados com base no limite e montadora
+def filter_data_by_montadora(df, montadora, time_column, limit_factor=1.02):
+    data = df[df['Montadora'] == montadora]
+    best_time = data[time_column].min()
+    limit = best_time * limit_factor
+    filtered_data = data[data[time_column] <= limit]
+    return filtered_data
+
+# Função para criar o box plot
+
+
+def create_box_plot(df, x_column, y_column, title, color_map):
+    fig = px.box(df, x=x_column, y=y_column, title=title, color=x_column,
+                 color_discrete_map=color_map, labels={y_column: title})
+    fig.update_layout(title=dict(text=title, font=dict(size=24), x=0.5, xanchor='center'),
+                      xaxis_title='Montadora', yaxis_title=title)
+    return fig
+
+
 with tabs[0]:
     # Streamlit
     st.title("Análise dos Tempos de Volta")
@@ -191,188 +211,69 @@ with tabs[0]:
 
 with tabs[1]:
 
-    # Filtrar os dados para cada montadora
-    chevrolet_data = df[df['Montadora'] == 'Chevrolet']
-    toyota_data = df[df['Montadora'] == 'Toyota']
+    df['S1 Tm'] = pd.to_numeric(df['S1 Tm'], errors='coerce')
+    df['S2 Tm'] = pd.to_numeric(df['S2 Tm'], errors='coerce')
+    df['S3 Tm'] = pd.to_numeric(df['S3 Tm'], errors='coerce')
 
-    # Calcular a melhor volta de cada montadora
-    best_chevrolet_time = chevrolet_data['Time in Seconds'].min()
-    best_toyota_time = toyota_data['Time in Seconds'].min()
+    # Solicitar ao usuário para selecionar o fator de limite
+    limit_factor = st.slider(
+        'Selecione o fator de limite', 1.01, 1.05, 1.01, 0.01)
 
-    # Definir o limite de 10% acima da melhor volta
-    chevrolet_limit = best_chevrolet_time * 1.05
-    toyota_limit = best_toyota_time * 1.05
+    # Garantir que os dados sejam numéricos (após a leitura)
+    df['S1 Tm'] = pd.to_numeric(df['S1 Tm'], errors='coerce')
+    df['S2 Tm'] = pd.to_numeric(df['S2 Tm'], errors='coerce')
+    df['S3 Tm'] = pd.to_numeric(df['S3 Tm'], errors='coerce')
 
-    # Filtrar os dados para remover outliers
-    chevrolet_filtered = chevrolet_data[chevrolet_data['Time in Seconds']
-                                        <= chevrolet_limit]
-    toyota_filtered = toyota_data[toyota_data['Time in Seconds']
-                                  <= toyota_limit]
+    # Filtrar dados de cada montadora com o limit_factor definido pelo usuário
+    chevrolet_filtered = filter_data_by_montadora(
+        df, 'Chevrolet', 'Time in Seconds', limit_factor)
+    toyota_filtered = filter_data_by_montadora(
+        df, 'Toyota', 'Time in Seconds', limit_factor)
 
-    # Criar um DataFrame combinado com a montadora após filtragem
-    chevrolet_filtered['Montadora'] = 'Chevrolet'
-    toyota_filtered['Montadora'] = 'Toyota'
-
+    # Criar o box plot para os tempos de volta
     combined_filtered_data = pd.concat([chevrolet_filtered, toyota_filtered])
+    fig_laptime = create_box_plot(combined_filtered_data, 'Montadora', 'Time in Seconds', 'Laptime',
+                                  {'Chevrolet': 'yellow', 'Toyota': 'red'})
 
-    # Criar o box plot
-    fig3 = px.box(
-        combined_filtered_data,
-        x='Montadora',
-        y='Time in Seconds',
-        title='Laptime',
-        color='Montadora',
-        color_discrete_map={'Chevrolet': 'yellow', 'Toyota': 'red'},
-        labels={'Lap Tm em Segundos': 'Tempo de Volta (segundos)'}
-    )
-
-    # Ajustes de layout adicionais
-    fig3.update_layout(
-        title=dict(text='Laptime', font=dict(size=24), x=0.5,
-                   xanchor='center'),  # Centraliza e aumenta o título
-        xaxis_title='Montadora',
-        yaxis_title='Tempo de volta'
-    )
-
-    chevrolet_data['S1 Tm'] = pd.to_numeric(
-        chevrolet_data['S1 Tm'], errors='coerce')
-    chevrolet_data['S1 Tm'] = chevrolet_data['S1 Tm'].fillna(float('inf'))
-    toyota_data['S1 Tm'] = pd.to_numeric(toyota_data['S1 Tm'], errors='coerce')
-    toyota_data['S1 Tm'] = toyota_data['S1 Tm'].fillna(
-        float('inf'))  # ou outro valor que faça sentido
-
-    # Melhor tempo do Setor 1 para cada montadora
-    best_chevrolet_s1_time = chevrolet_data['S1 Tm'].min()
-    best_toyota_s1_time = toyota_data['S1 Tm'].min()
-
-    # Definir o limite de 10% acima da melhor volta do Setor 1
-    chevrolet_s1_limit = best_chevrolet_s1_time * 1.02
-    toyota_s1_limit = best_toyota_s1_time * 1.02
-
-    # Filtrar os dados para remover outliers do Setor 1
-    chevrolet_filtered_s1 = chevrolet_data[chevrolet_data['S1 Tm']
-                                           <= chevrolet_s1_limit]
-    toyota_filtered_s1 = toyota_data[toyota_data['S1 Tm'] <= toyota_s1_limit]
-
-    # Criar um DataFrame combinado com a montadora após filtragem
-    chevrolet_filtered_s1['Montadora'] = 'Chevrolet'
-    toyota_filtered_s1['Montadora'] = 'Toyota'
-
+    # Filtrar dados para o Setor 1 com o limit_factor
+    chevrolet_filtered_s1 = filter_data_by_montadora(
+        df, 'Chevrolet', 'S1 Tm', limit_factor)
+    toyota_filtered_s1 = filter_data_by_montadora(
+        df, 'Toyota', 'S1 Tm', limit_factor)
     combined_filtered_s1_data = pd.concat(
         [chevrolet_filtered_s1, toyota_filtered_s1])
+    fig_s1 = create_box_plot(combined_filtered_s1_data, 'Montadora', 'S1 Tm', 'Setor 1',
+                             {'Chevrolet': 'yellow', 'Toyota': 'red'})
 
-    # Criar o box plot para Setor 1
-    fig_s1 = px.box(
-        combined_filtered_s1_data,
-        x='Montadora',
-        y='S1 Tm',
-        title='Setor 1',
-        color='Montadora',
-        color_discrete_map={'Chevrolet': 'yellow', 'Toyota': 'red'},
-        labels={'S1 Tm': 'Tempo do Setor 1'}
-    )
-
-    # Ajustes de layout adicionais
-    fig_s1.update_layout(
-        title=dict(text='Setor 1', font=dict(size=24), x=0.5,
-                   xanchor='center'),  # Centraliza e aumenta o título
-        xaxis_title='Montadora',
-        yaxis_title='Tempo do Setor 1'
-    )
-
-    chevrolet_data['S2 Tm'] = pd.to_numeric(
-        chevrolet_data['S2 Tm'], errors='coerce')
-    chevrolet_data['S2 Tm'] = chevrolet_data['S2 Tm'].fillna(float('inf'))
-    toyota_data['S2 Tm'] = pd.to_numeric(toyota_data['S2 Tm'], errors='coerce')
-    toyota_data['S2 Tm'] = toyota_data['S2 Tm'].fillna(
-        float('inf'))  # ou outro valor que faça sentido
-
-    # Melhor tempo do Setor 2 para cada montadora
-    best_chevrolet_s2_time = chevrolet_data['S2 Tm'].min()
-    best_toyota_s2_time = toyota_data['S2 Tm'].min()
-
-    # Definir o limite de 10% acima da melhor volta do Setor 1
-    chevrolet_s2_limit = best_chevrolet_s2_time * 1.02
-    toyota_s2_limit = best_toyota_s2_time * 1.02
-
-    # Filtrar os dados para remover outliers do Setor 1
-    chevrolet_filtered_s2 = chevrolet_data[chevrolet_data['S2 Tm']
-                                           <= chevrolet_s2_limit]
-    toyota_filtered_s2 = toyota_data[toyota_data['S2 Tm'] <= toyota_s2_limit]
-
-    # Criar um DataFrame combinado com a montadora após filtragem
-    chevrolet_filtered_s2['Montadora'] = 'Chevrolet'
-    toyota_filtered_s2['Montadora'] = 'Toyota'
-
+    # Filtrar dados para o Setor 2 com o limit_factor
+    chevrolet_filtered_s2 = filter_data_by_montadora(
+        df, 'Chevrolet', 'S2 Tm', limit_factor)
+    toyota_filtered_s2 = filter_data_by_montadora(
+        df, 'Toyota', 'S2 Tm', limit_factor)
     combined_filtered_s2_data = pd.concat(
         [chevrolet_filtered_s2, toyota_filtered_s2])
+    fig_s2 = create_box_plot(combined_filtered_s2_data, 'Montadora', 'S2 Tm', 'Setor 2',
+                             {'Chevrolet': 'yellow', 'Toyota': 'red'})
 
-    # Criar o box plot para Setor 1
-    fig_s2 = px.box(
-        combined_filtered_s2_data,
-        x='Montadora',
-        y='S2 Tm',
-        title='Setor 2',
-        color='Montadora',
-        color_discrete_map={'Chevrolet': 'yellow', 'Toyota': 'red'},
-        labels={'S2 Tm': 'Tempo do Setor 2'}
-    )
-
-    # Ajustes de layout adicionais
-    fig_s2.update_layout(
-        title=dict(text='Setor 2', font=dict(size=24), x=0.5,
-                   xanchor='center'),  # Centraliza e aumenta o título
-        xaxis_title='Montadora',
-        yaxis_title='Tempo do Setor 2'
-    )
-
-    # Melhor tempo do Setor 1 para cada montadora
-    best_chevrolet_s3_time = chevrolet_data['S3 Tm'].min()
-    best_toyota_s3_time = toyota_data['S3 Tm'].min()
-
-    # Definir o limite de 10% acima da melhor volta do Setor 3
-    chevrolet_s3_limit = best_chevrolet_s3_time * 1.02
-    toyota_s3_limit = best_toyota_s3_time * 1.02
-
-    # Filtrar os dados para remover outliers do Setor 1
-    chevrolet_filtered_s3 = chevrolet_data[chevrolet_data['S3 Tm']
-                                           <= chevrolet_s3_limit]
-    toyota_filtered_s3 = toyota_data[toyota_data['S3 Tm'] <= toyota_s3_limit]
-
-    # Criar um DataFrame combinado com a montadora após filtragem
-    chevrolet_filtered_s3['Montadora'] = 'Chevrolet'
-    toyota_filtered_s3['Montadora'] = 'Toyota'
-
+    # Filtrar dados para o Setor 3 com o limit_factor
+    chevrolet_filtered_s3 = filter_data_by_montadora(
+        df, 'Chevrolet', 'S3 Tm', limit_factor)
+    toyota_filtered_s3 = filter_data_by_montadora(
+        df, 'Toyota', 'S3 Tm', limit_factor)
     combined_filtered_s3_data = pd.concat(
         [chevrolet_filtered_s3, toyota_filtered_s3])
+    fig_s3 = create_box_plot(combined_filtered_s3_data, 'Montadora', 'S3 Tm', 'Setor 3',
+                             {'Chevrolet': 'yellow', 'Toyota': 'red'})
 
-    # Criar o box plot para Setor 1
-    fig_s3 = px.box(
-        combined_filtered_s3_data,
-        x='Montadora',
-        y='S3 Tm',
-        title='Setor 3',
-        color='Montadora',
-        color_discrete_map={'Chevrolet': 'yellow', 'Toyota': 'red'},
-        labels={'S3 Tm': 'Tempo do Setor 3'}
-    )
-
-    # Ajustes de layout adicionais
-    fig_s3.update_layout(
-        title=dict(text='Setor 3', font=dict(size=24), x=0.5,
-                   xanchor='center'),  # Centraliza e aumenta o título
-        xaxis_title='Montadora',
-        yaxis_title='Tempo do Setor 3'
-    )
-
-    # Exibir gráfico no Streamlit
+    # Exibir gráficos no Streamlit
     st.plotly_chart(fig_s1)
     st.write('')
     st.plotly_chart(fig_s2)
     st.write('')
     st.plotly_chart(fig_s3)
     st.write('')
-    st.plotly_chart(fig3)
+    st.plotly_chart(fig_laptime)
+
 
 with tabs[2]:
     # Criar um DataFrame para os tempos de volta e setores

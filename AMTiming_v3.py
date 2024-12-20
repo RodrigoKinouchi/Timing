@@ -442,7 +442,7 @@ with tabs[3]:
                                               line=dict(width=1, color='DarkSlateGrey')))
         fig_gap_lap.update_layout(title_x=0.5,  # Centralizar o título
                                   title=dict(font=dict(size=24)),
-                                  xaxis_title='Número da Volta',
+                                  xaxis_title='Volta',
                                   yaxis_title='GAP (s)')
 
         # Exibir o gráfico GAP x Lap

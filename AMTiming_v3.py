@@ -356,53 +356,98 @@ with tabs[2]:
 with tabs[3]:
     results = []
     current_pilot = None
+    spt_values = []  # Lista para armazenar os valores de SPT por volta
 
+    # Iterando sobre as linhas para criar os dados
     for index, row in df.iterrows():  # Usando iterrows() para acessar as linhas
         if "Stock" in row[0]:  # Se for o nome do piloto (coluna 0)
             current_pilot = row[0]
         elif isinstance(row[0], str) and ':' in row[0]:  # Verifica se é um tempo
             time = pd.to_timedelta(row[0])
-            spt = row[7]  # Acessar a coluna SPT (índice 17)
+            spt = row[7]  # Acessar a coluna SPT (índice 7)
             results.append((current_pilot, time, spt))
+            spt_values.append(spt)  # Adicionar o valor de SPT para essa volta
 
+    # Criando um DataFrame com os dados
     cleaned_df = pd.DataFrame(
         results, columns=['Piloto', 'Time of Day', 'SPT'])
     cleaned_df = cleaned_df.sort_values(
         by='Time of Day').reset_index(drop=True)
     cleaned_df['Piloto'] = cleaned_df['Piloto'].str.replace(
         ' - Stock Car PRO 2024', '', regex=False)
-    # GAP para cada carro em relação ao anterior
+
+    # Criando uma coluna GAP para cada piloto
     cleaned_df['GAP'] = cleaned_df['Time of Day'].diff().dt.total_seconds()
+
+    # Agora, vamos associar o SPT da volta seguinte à volta atual
+    # SPT da próxima volta
+    cleaned_df['SPT_next'] = cleaned_df['SPT'].shift(-1)
+
+    # Remover a última linha onde o próximo SPT é NaN
+    cleaned_df.dropna(subset=['SPT_next'], inplace=True)
+
     # Preencher o primeiro GAP como 0
     cleaned_df['GAP'].fillna(0, inplace=True)
+
+    cleaned_df['Lap'] = cleaned_df.groupby('Piloto').cumcount() + 1
+
     # Selecionar o piloto para análise
     pilotos = cleaned_df['Piloto'].unique().tolist()
     pilotos.insert(0, "")  # Adiciona uma opção vazia no início
     selected_pilot = st.selectbox('Selecione um piloto:', pilotos)
-   # Filtrar apenas os dados do piloto selecionado se houver seleção
+
+    # Filtrar apenas os dados do piloto selecionado se houver seleção
     if selected_pilot:
         pilot_data = cleaned_df[cleaned_df['Piloto'] == selected_pilot]
 
         # Filtrar para SPT acima de 200
-        filtered_data = pilot_data[(
-            pilot_data['SPT'] > 200)]
+        # Usar SPT da próxima volta
+        filtered_data = pilot_data[(pilot_data['SPT_next'] > 200)]
 
-        # Criar o gráfico interativo usando Plotly
-        fig = px.scatter(
+        # Criar o gráfico GAP x SPT
+        fig_gap_speed = px.scatter(
             filtered_data,
             x='GAP',
-            y='SPT',
+            y='SPT_next',  # Usar o SPT da próxima volta
             title=f'GAP vs Velocidade (SPT) > 200 km/h para {selected_pilot}',
-            labels={'GAP': 'GAP (s)', 'SPT': 'Velocidade (SPT) (km/h)'},
+            labels={'GAP': 'GAP (s)', 'SPT_next': 'Velocidade (SPT) (km/h)'},
         )
 
-        # Personalizar o layout
-        fig.update_traces(marker=dict(size=10, opacity=0.7,
-                          line=dict(width=1, color='DarkSlateGrey')))
-        fig.update_layout(title_x=0.3)  # Centralizar o título
+        # Personalizar o layout do gráfico GAP x SPT
+        fig_gap_speed.update_traces(marker=dict(size=10, opacity=0.7,
+                                                line=dict(width=1, color='DarkSlateGrey')))
+        fig_gap_speed.update_layout(title_x=0.3,  # Centralizar o título
+                                    title=dict(font=dict(size=24)),
+                                    xaxis_title='GAP (s)',
+                                    yaxis_title='Velocidade (SPT) (km/h)')
 
-        # Exibir o gráfico no Streamlit
-        st.plotly_chart(fig)
+        # Exibir o gráfico GAP x Speed
+        st.plotly_chart(fig_gap_speed)
+
+        # Criar o gráfico GAP x Lap
+        cleaned_df['Lap'] = cleaned_df['Time of Day'].dt.floor(
+            'D').astype('str')  # Para associar com a volta
+
+        # Gráfico GAP x Número da Volta (Lap)
+        fig_gap_lap = px.scatter(
+            filtered_data,
+            x='Lap',  # Número da volta
+            y='GAP',  # GAP em segundos
+            title=f'GAP x Número da Volta para {selected_pilot}',
+            labels={'Lap': 'Número da Volta', 'GAP': 'GAP (s)'},
+        )
+
+        # Personalizar o layout do gráfico GAP x Lap
+        fig_gap_lap.update_traces(marker=dict(size=8, opacity=0.7,
+                                              line=dict(width=1, color='DarkSlateGrey')))
+        fig_gap_lap.update_layout(title_x=0.5,  # Centralizar o título
+                                  title=dict(font=dict(size=24)),
+                                  xaxis_title='Número da Volta',
+                                  yaxis_title='GAP (s)')
+
+        # Exibir o gráfico GAP x Lap
+        st.plotly_chart(fig_gap_lap)
+
     else:
         st.warning('Por favor, selecione um piloto.')
 
